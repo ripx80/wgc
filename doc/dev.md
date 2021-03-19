@@ -10,8 +10,11 @@ Goals:
 
 ### v0.1
 
+- [ ] (F) print current config
 - [ ] (F) json config file (compatible with contrib/json)
 - [ ] (F) setup wg interface
+- [ ] (F) connect to peer
+- [ ] (F) disconnect from peer
 - [ ] (F) net namespace support
 
 ## Router
@@ -60,6 +63,23 @@ Goals:
 - Central Router (traffic in/out)
 - Signaling Router (only signaling nodes and endpoints)
 
+- Node
+  - n-interfaces
+  - n-wg-interfaces
+  - n-peers, n-ovpn-peers
+  - device-priv-key
+  - n-dns servers
+  - n-domains
+
+- Peer (pubkey)
+  - endpoint (ip:port)
+  - allowed-ips (ip/mask)
+  - pre-shared-key
+  - keep-alive
+  - mtu
+
+- fwmakrs (comming/research)
+
 ## API
 
 All internal and external calls go through the go api
@@ -87,6 +107,10 @@ All internal and external calls go through the go api
 - exec cmd in net namespace
 
 ## Question
+
+### Use multiple fw tables for configs?
+
+table=51820 default wg-quick table
 
 ### how verify the person/device?
 
@@ -119,8 +143,19 @@ with node names?
 - techs
 - self hoster
 
+### Multiple pubkeys like age
+
+[age](https://github.com/FiloSottile/age)
+
+### Use kernel module if available?
+
+```bash
+[[ -e /sys/module/wireguard ]] || ! command -v "${WG_QUICK_USERSPACE_IMPLEMENTATION:-wireguard-go}" >/dev/null && exit $ret
+```
+
 ## docs
 
 - [tailscale](https://tailscale.com/blog/)
   - use maschine and node keys curve
   - node key: human identity, OAuth2 identity provider
+- [netlink](https://pkg.go.dev/github.com/docker/libcontainer/netlink)

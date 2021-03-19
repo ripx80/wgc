@@ -10,6 +10,12 @@ examples: /usr/share/wireguard-tools/examples
     - extract-keys: extract the symmetric ChaCha20Poly1305 session keys from kernel mem (can not compile)
     - reresolve-dns/reresolve-dns.sh: recover from an endpoint that has changed its IP
 
+wg:
+
+```txt
+Usage: wg set <interface> [listen-port <port>] [fwmark <mark>] [private-key <file path>] [peer <base64 public key> [remove] [preshared-key <file path>] [endpoint <ip>:<port>] [persistent-keepalive <interval seconds>] [allowed-ips <ip1>/<cidr1>[,<ip2>/<cidr2>]...] ]...
+```
+
 ## Manual Setup
 
 ### Node-A
