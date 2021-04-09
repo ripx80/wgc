@@ -1,22 +1,25 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net"
 	"strings"
 
 	"github.com/docker/libcontainer/netlink"
+	"go.uber.org/zap"
 
 	"golang.zx2c4.com/wireguard/wgctrl"
 	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
 )
 
 func show(dev string) {
-
 	c, err := wgctrl.New()
 	if err != nil {
-		log.Fatalf("failed to open wgctrl: %v", err)
+		fmt.Printf("failed to open wgctrl: %v", err)
+		return
 	}
 	defer c.Close()
 
@@ -25,9 +28,7 @@ func show(dev string) {
 		log.Fatalf("failed to get device %q: %v", dev, err)
 	}
 	printWg(d)
-
 	//devices, err = c.Devices()
-
 }
 
 func printWg(wg *wgtypes.Device) {
@@ -37,6 +38,40 @@ func printWg(wg *wgtypes.Device) {
 	}
 }
 
+type Config map[string]wgtypes.Config
+
+// type Unpacker struct {
+// 	Data interface{}
+// }
+
+// func (u *Unpacker) UnmarshalJSON(b []byte) error {
+// 	device := &wgtypes.Device{}
+// 	err := json.Unmarshal(b, device)
+// 	// abort if we have an error other than the wrong type
+// 	if _, ok := err.(*json.UnmarshalTypeError); err != nil && !ok {
+// 		return err
+// 	}
+// 	fmt.Println(device)
+// 	return nil
+// }
+
+func readConfig() error {
+	b, err := ioutil.ReadFile("../wgc.json")
+	if err != nil {
+		return err
+	}
+	c := make(Config)
+	err = json.Unmarshal(b, &c)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println(c)
+
+	return nil
+
+}
+
 func config(dev string) {
 
 	peerpub, err := wgtypes.ParseKey("YkWRYOOFndLypbSTiEiN22hHzaIvOKYAmUSfSpmbLz8=")
@@ -44,16 +79,22 @@ func config(dev string) {
 		fmt.Println(err)
 		return
 	}
-	endpoint, _, err := net.ParseCIDR("192.168.399.11/32")
+	endpoint, _, err := net.ParseCIDR("192.168.200.11/32")
 	if err != nil {
 		fmt.Println(err)
+		return
 	}
-	_, n, err := net.ParseCIDR("192.168.399.0/24")
+	_, n, err := net.ParseCIDR("192.168.200.0/24")
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 	var allowedIPs []net.IPNet
 	allowedIPs = append(allowedIPs, *n)
 
 	if err != nil {
 		fmt.Println(err)
+		return
 	}
 	peers := []wgtypes.PeerConfig{
 		{PublicKey: peerpub,
@@ -83,44 +124,63 @@ func config(dev string) {
 		fmt.Println(err)
 		return
 	}
-	d, _ := c.Device(dev)
-	printWg(d)
+	// d, err := c.Device(dev)
+	// if err != nil {
+	// 	fmt.Println(err)
+	// 	return
+	// }
+	// printWg(d)
 
 }
 
-func create(name string) {
+func create(name string) error {
 	// ip link add dev wg0 type wireguard
+	return netlink.NetworkLinkAdd(name, "wireguard")
+}
+
+func delete(name string) error {
 	// ip link del dev wg0 type wireguard
-
-	err := netlink.NetworkLinkAdd(name, "wireguard")
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
+	return netlink.NetworkLinkDel(name)
 }
 
-func delete(name string) {
-	err := netlink.NetworkLinkDel(name)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-}
+// func logFatal(log sugar ,err error){
+// 	log.
+// }
 
 func main() {
 	dev := "wg1"
-	delete(dev)
-	return
 
-	create(dev)
+	err := readConfig()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	return
+	//delete(dev)
+	//return
+
+	logger, _ := zap.NewProduction()
+	defer logger.Sync() // flushes buffer, if any
+	log := logger.Sugar()
+	// log.Infow("failed to fetch URL",
+	// 	// Structured context as loosely typed key-value pairs.
+	// 	"url", url,
+	// 	"attempt", 3,
+	// 	"backoff", time.Second,
+	// )
+
+	err = create(dev)
+	if err != nil {
+		log.Infof("create failed: %s", err)
+		return
+	}
 	wgd, err := net.InterfaceByName(dev)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	ip, netip, err := net.ParseCIDR("192.168.399.2/24")
+	ip, netip, err := net.ParseCIDR("192.168.200.2/24")
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -128,6 +188,7 @@ func main() {
 	err = netlink.NetworkLinkAddIp(wgd, ip, netip)
 	if err != nil {
 		fmt.Println(err)
+		return
 	}
 
 	err = netlink.NetworkLinkUp(wgd)
@@ -138,14 +199,16 @@ func main() {
 
 	config(dev)
 
-	//show(dev)
+	show(dev)
+
+	delete(dev)
 
 }
 
 func printDevice(d *wgtypes.Device) {
 	const f = `interface: %s (%s)
   public key: %s
-  private key: (hidden)
+  private key: %s
   listening port: %d
 `
 
@@ -154,6 +217,7 @@ func printDevice(d *wgtypes.Device) {
 		d.Name,
 		d.Type.String(),
 		d.PublicKey.String(),
+		d.PrivateKey.String(),
 		d.ListenPort)
 }
 
